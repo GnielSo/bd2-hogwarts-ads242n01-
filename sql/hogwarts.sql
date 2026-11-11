@@ -888,51 +888,101 @@ SELECT 'Total de galeoes nos cofres dos alunos',
        CAST(COALESCE(SUM(saldo_galeoes),0) AS CHAR)
 FROM aluno;
 
-
 -- =====================================================================
--- 7. VIEWS
+-- 7. VIEWS: OS QUADROS DE AVISOS DE HOGWARTS
 -- =====================================================================
--- Questão 31
 
--- Questão 32
+-- Questao 31: placar das casas
+CREATE OR REPLACE VIEW vw_placar_casas AS
+SELECT nome_casa, pontos
+FROM casa
+ORDER BY pontos DESC;
 
--- Questão 33
+-- Questao 32: boletim de todas as matriculas
+CREATE OR REPLACE VIEW vw_boletim AS
+SELECT a.nome AS aluno,
+       COALESCE(c.nome_casa, 'Sem casa') AS casa,
+       d.nome_disc AS disciplina,
+       COALESCE(p.nome, 'Sem professor') AS professor,
+       m.nota,
+       m.situacao
+FROM matricula m
+JOIN aluno a ON a.id_aluno = m.id_aluno
+LEFT JOIN casa c ON c.id_casa = a.id_casa
+JOIN disciplina d ON d.id_disc = m.id_disc
+LEFT JOIN professor p ON p.id_prof = d.id_prof;
 
--- Questão 34
+-- Questao 33: extrato da loja
+CREATE OR REPLACE VIEW vw_extrato_loja AS
+SELECT a.nome AS aluno,
+       pr.nome_produto AS produto,
+       pr.loja,
+       co.quantidade,
+       co.valor_total,
+       co.data_compra
+FROM compra co
+JOIN aluno a ON a.id_aluno = co.id_aluno
+JOIN produto pr ON pr.id_produto = co.id_produto;
 
--- Questão 35
+-- Questao 34: alunos destaque
+CREATE OR REPLACE VIEW vw_alunos_destaque AS
+SELECT a.nome AS aluno,
+       c.nome_casa AS casa,
+       ROUND(AVG(m.nota), 2) AS media
+FROM aluno a
+JOIN casa c ON c.id_casa = a.id_casa
+JOIN matricula m ON m.id_aluno = a.id_aluno
+GROUP BY a.id_aluno, a.nome, c.nome_casa
+HAVING AVG(m.nota) >= 8;
 
--- Questão 36
+-- Questao 35: quadro de professores
+CREATE OR REPLACE VIEW vw_quadro_professores AS
+SELECT p.nome AS professor,
+       COALESCE(c.nome_casa, 'Nao e diretor') AS casa_que_dirige,
+       (SELECT COUNT(*)
+        FROM disciplina d
+        WHERE d.id_prof = p.id_prof) AS quantidade_disciplinas,
+       COALESCE((SELECT SUM(r.pontos)
+                 FROM registro_pontos r
+                 WHERE r.id_prof = p.id_prof), 0) AS total_pontos_concedidos
+FROM professor p
+LEFT JOIN casa c ON c.id_casa = p.id_casa;
 
--- Questão 37
--- O que mudou e por quê:
+-- Questao 36: consultas usando as views
 
--- Questão 38
+-- a) Consultar o placar
+SELECT * FROM vw_placar_casas ORDER BY pontos DESC;
 
+-- b) Boletim apenas dos alunos da Corvinal
+SELECT * FROM vw_boletim WHERE casa = 'Corvinal';
 
--- =====================================================================
--- 8. CONTROLE DE ACESSO (DCL)
--- =====================================================================
--- Questão 39
+-- c) Total faturado por loja
+SELECT loja, SUM(valor_total) AS total_faturado
+FROM vw_extrato_loja
+GROUP BY loja
+ORDER BY total_faturado DESC;
 
--- Questão 40
+-- d) Alunos destaque
+SELECT * FROM vw_alunos_destaque ORDER BY media DESC;
 
--- Questão 41
+-- e) Quadro de professores
+SELECT * FROM vw_quadro_professores
+ORDER BY total_pontos_concedidos DESC;
 
--- Questão 42
+-- Questao 37: view e dinamica; inserir pontos para Cedrico
+INSERT INTO registro_pontos
+(id_aluno, id_prof, pontos, motivo, data_registro)
+VALUES (11, 1, 20, 'Venceu a primeira tarefa do Torneio', '2026-11-10');
 
--- Questão 43
+SELECT * FROM vw_placar_casas ORDER BY pontos DESC;
+-- Resposta: a pontuacao da Lufa-Lufa aumenta em 20 pontos. A view consulta
+-- os dados atuais das tabelas; nao e uma copia estatica dos resultados.
 
--- Questão 44
--- Resultado de cada comando:
+-- Questao 38: incluir fundador no placar
+CREATE OR REPLACE VIEW vw_placar_casas AS
+SELECT nome_casa, fundador, pontos
+FROM casa
+ORDER BY pontos DESC;
 
--- Questão 45
--- Como o trigger conseguiu atualizar a casa:
-
--- Questão 46
-
--- Questão 47
--- Vantagem dos papéis:
-
--- Questão 48
+SELECT * FROM vw_placar_casas;
 
