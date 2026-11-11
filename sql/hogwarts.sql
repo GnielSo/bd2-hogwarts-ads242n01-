@@ -607,76 +607,286 @@ SELECT nome_casa, pontos FROM casa ORDER BY pontos DESC;
 SELECT COUNT(*) AS total_registros FROM registro_pontos;
 
 -- =====================================================================
--- 6. DESAFIOS DE CONSULTA
+-- 6. DESAFIOS DE CONSULTA (SQL AVANCADO)
+-- Executar apos as secoes 2 a 5
 -- =====================================================================
--- ---------- Nível 1: filtros e operadores especiais ----------
 
--- 6.1
+-- 6.1 Faixa salarial (BETWEEN)
+SELECT p.nome, p.salario
+FROM professor p
+WHERE p.salario BETWEEN 6000.00 AND 9000.00
+ORDER BY p.salario DESC;
 
--- 6.2
+-- 6.2 Anos selecionados (IN)
+SELECT a.nome, a.ano_escolar
+FROM aluno a
+WHERE a.ano_escolar IN (1,4,6,7)
+ORDER BY a.ano_escolar;
 
--- 6.3
+-- 6.3 Busca por padrao (LIKE com _)
+SELECT a.nome
+FROM aluno a
+WHERE a.nome LIKE '_a%';
 
--- 6.4
+-- 6.4 Disciplina orfa (IS NULL)
+SELECT d.nome_disc
+FROM disciplina d
+WHERE d.id_prof IS NULL;
 
--- 6.5
+-- 6.5 Fora da faixa (NOT BETWEEN)
+SELECT p.nome_produto, p.preco
+FROM produto p
+WHERE p.preco NOT BETWEEN 5 AND 20
+ORDER BY p.preco;
 
--- 6.6
+-- 6.6 Lojas do Beco Diagonal (DISTINCT)
+SELECT DISTINCT p.loja
+FROM produto p
+ORDER BY p.loja;
 
--- ---------- Nível 2: JOINs ----------
+-- 6.7 Quem e de qual casa (INNER JOIN)
+SELECT a.nome AS aluno, c.nome_casa AS casa
+FROM aluno a
+INNER JOIN casa c ON c.id_casa = a.id_casa
+ORDER BY c.nome_casa, a.nome;
+-- Esperado: 12 alunos. Teddy nao possui casa (id_casa NULL), por isso
+-- nao aparece no INNER JOIN.
 
--- 6.7
--- Quantos alunos e por quê:
+-- 6.8 Todos os alunos (LEFT JOIN)
+SELECT a.nome AS aluno,
+       COALESCE(c.nome_casa, 'Aguardando o Chapeu Seletor') AS casa
+FROM aluno a
+LEFT JOIN casa c ON c.id_casa = a.id_casa
+ORDER BY a.nome;
 
--- 6.8
+-- 6.9 Professor sem turma (RIGHT JOIN)
+SELECT p.nome AS professor
+FROM disciplina d
+RIGHT JOIN professor p ON p.id_prof = d.id_prof
+WHERE d.id_disc IS NULL;
 
--- 6.9
+-- 6.10 Boletim da Grifinoria (JOIN com 5 tabelas)
+SELECT a.nome AS aluno,
+       c.nome_casa AS casa,
+       d.nome_disc AS disciplina,
+       COALESCE(p.nome, 'Sem professor') AS professor,
+       m.nota,
+       m.situacao
+FROM aluno a
+JOIN casa c ON c.id_casa = a.id_casa
+JOIN matricula m ON m.id_aluno = a.id_aluno
+JOIN disciplina d ON d.id_disc = m.id_disc
+LEFT JOIN professor p ON p.id_prof = d.id_prof
+WHERE c.nome_casa = 'Grifinoria'
+ORDER BY a.nome, d.nome_disc;
 
--- 6.10
+-- 6.11 Extrato do Beco Diagonal (JOIN com 3 tabelas)
+SELECT co.id_compra AS numero_compra,
+       a.nome AS aluno,
+       pr.nome_produto AS produto,
+       pr.loja,
+       co.quantidade,
+       co.valor_total,
+       co.data_compra
+FROM compra co
+JOIN aluno a ON a.id_aluno = co.id_aluno
+JOIN produto pr ON pr.id_produto = co.id_produto
+ORDER BY co.data_compra;
 
--- 6.11
+-- 6.12 Desempenho por disciplina
+SELECT d.nome_disc AS disciplina,
+       COUNT(m.id_aluno) AS quantidade_alunos,
+       ROUND(AVG(m.nota), 2) AS media,
+       MAX(m.nota) AS maior_nota,
+       MIN(m.nota) AS menor_nota
+FROM disciplina d
+JOIN matricula m ON m.id_disc = d.id_disc
+GROUP BY d.id_disc, d.nome_disc
+HAVING AVG(m.nota) >= 7
+ORDER BY media DESC;
 
--- ---------- Nível 3: agrupamento e agregação ----------
+-- 6.13 Livro-razao da Taca
+SELECT c.nome_casa,
+       COUNT(r.id_registro) AS quantidade_registros,
+       SUM(CASE WHEN r.pontos > 0 THEN r.pontos ELSE 0 END) AS pontos_ganhos,
+       SUM(CASE WHEN r.pontos < 0 THEN r.pontos ELSE 0 END) AS pontos_perdidos,
+       COALESCE(SUM(r.pontos), 0) AS saldo_pontos
+FROM casa c
+LEFT JOIN aluno a ON a.id_casa = c.id_casa
+LEFT JOIN registro_pontos r ON r.id_aluno = a.id_aluno
+GROUP BY c.id_casa, c.nome_casa
+ORDER BY c.nome_casa;
 
--- 6.12
+-- 6.14 Faturamento por loja
+SELECT pr.loja,
+       COUNT(co.id_compra) AS quantidade_compras,
+       SUM(co.valor_total) AS faturamento
+FROM produto pr
+JOIN compra co ON co.id_produto = pr.id_produto
+GROUP BY pr.loja
+HAVING SUM(co.valor_total) > 20
+ORDER BY faturamento DESC;
 
--- 6.13
+-- 6.15 Pontos por mes
+SELECT MONTH(r.data_registro) AS mes,
+       COUNT(*) AS quantidade_registros,
+       SUM(r.pontos) AS total_pontos
+FROM registro_pontos r
+GROUP BY MONTH(r.data_registro)
+ORDER BY mes;
 
--- 6.14
+-- 6.16 Professores mais ativos
+SELECT p.nome,
+       COUNT(r.id_registro) AS quantidade_registros,
+       SUM(r.pontos) AS total_concedido
+FROM professor p
+JOIN registro_pontos r ON r.id_prof = p.id_prof
+GROUP BY p.id_prof, p.nome
+HAVING COUNT(r.id_registro) >= 2
+ORDER BY total_concedido DESC;
 
--- 6.15
+-- 6.17 Clientes da Dedosdemel (IN, sem JOIN)
+SELECT a.nome
+FROM aluno a
+WHERE a.id_aluno IN (
+    SELECT co.id_aluno
+    FROM compra co
+    WHERE co.id_produto IN (
+        SELECT pr.id_produto
+        FROM produto pr
+        WHERE pr.loja = 'Dedosdemel'
+    )
+);
 
--- 6.16
+-- 6.18 Encalhados (NOT IN)
+SELECT pr.nome_produto, pr.estoque
+FROM produto pr
+WHERE pr.id_produto NOT IN (
+    SELECT co.id_produto FROM compra co
+);
 
--- ---------- Nível 4: subconsultas ----------
+-- 6.19 Cofres cheios (subconsulta escalar)
+SELECT a.nome, a.saldo_galeoes
+FROM aluno a
+WHERE a.saldo_galeoes > (
+    SELECT AVG(a2.saldo_galeoes) FROM aluno a2
+);
 
--- 6.17
+-- 6.20 Acima de todos (ALL)
+SELECT p.nome, p.salario
+FROM professor p
+WHERE p.salario > ALL (
+    SELECT p2.salario
+    FROM professor p2
+    WHERE p2.id_casa IS NULL
+);
 
--- 6.18
+-- 6.21 Mais rico que algum sonserino (ANY)
+SELECT a.nome, a.saldo_galeoes
+FROM aluno a
+WHERE (a.id_casa IS NULL OR a.id_casa <> 2)
+  AND a.saldo_galeoes > ANY (
+      SELECT a2.saldo_galeoes
+      FROM aluno a2
+      WHERE a2.id_casa = 2
+  );
+-- Resposta: > ANY significa maior que pelo menos um valor da subconsulta.
+-- Portanto, equivale a ser maior que o menor valor retornado, e nao o maior.
 
--- 6.19
+-- 6.22 Casas com nota maxima (EXISTS)
+SELECT c.nome_casa
+FROM casa c
+WHERE EXISTS (
+    SELECT 1
+    FROM aluno a
+    JOIN matricula m ON m.id_aluno = a.id_aluno
+    WHERE a.id_casa = c.id_casa
+      AND m.nota = 10
+);
 
--- 6.20
+-- 6.23 Nunca foram ao Beco (NOT EXISTS)
+SELECT a.nome
+FROM aluno a
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM compra co
+    WHERE co.id_aluno = a.id_aluno
+);
 
--- 6.21
--- > ANY equivale a:
+-- 6.24 Media das medias (subconsulta no FROM)
+SELECT c.nome_casa,
+       ROUND(AVG(media_aluno.media_individual), 2) AS media_da_casa
+FROM casa c
+JOIN aluno a ON a.id_casa = c.id_casa
+JOIN (
+    SELECT m.id_aluno, AVG(m.nota) AS media_individual
+    FROM matricula m
+    GROUP BY m.id_aluno
+) AS media_aluno ON media_aluno.id_aluno = a.id_aluno
+GROUP BY c.id_casa, c.nome_casa
+ORDER BY media_da_casa DESC;
 
--- 6.22
+-- 6.25 Diretorio de Hogwarts (UNION ALL)
+SELECT nome, vinculo
+FROM (
+    SELECT a.nome AS nome, 'Aluno' AS vinculo FROM aluno a
+    UNION ALL
+    SELECT p.nome AS nome, 'Professor' AS vinculo FROM professor p
+) AS diretorio
+ORDER BY nome;
 
--- 6.23
+-- 6.26 UNION x UNION ALL
+-- UNION ALL mantem repeticoes
+SELECT a.nome
+FROM aluno a
+WHERE a.id_aluno IN (SELECT co.id_aluno FROM compra co)
+UNION ALL
+SELECT a.nome
+FROM aluno a
+WHERE a.id_aluno IN (SELECT r.id_aluno FROM registro_pontos r);
 
--- 6.24
+-- UNION remove nomes duplicados
+SELECT a.nome
+FROM aluno a
+WHERE a.id_aluno IN (SELECT co.id_aluno FROM compra co)
+UNION
+SELECT a.nome
+FROM aluno a
+WHERE a.id_aluno IN (SELECT r.id_aluno FROM registro_pontos r);
 
--- ---------- Nível 5: UNION ALL ----------
+-- Para contar o resultado de cada operacao:
+SELECT COUNT(*) AS linhas_union_all
+FROM (
+    SELECT co.id_aluno AS id_aluno FROM compra co
+    UNION ALL
+    SELECT r.id_aluno FROM registro_pontos r
+) AS resultado_union_all;
 
--- 6.25
+SELECT COUNT(*) AS linhas_union
+FROM (
+    SELECT co.id_aluno AS id_aluno FROM compra co
+    UNION
+    SELECT r.id_aluno FROM registro_pontos r
+) AS resultado_union;
 
--- 6.26
--- Linhas com UNION ALL:
--- Linhas com UNION:
--- Explicação:
+-- Resposta: UNION ALL conserva todas as ocorrencias; UNION elimina duplicatas.
 
--- 6.27
+-- 6.27 Painel do Diretor
+SELECT 'Total de pontos distribuidos' AS indicador,
+       CAST(COALESCE(SUM(pontos),0) AS CHAR) AS valor
+FROM registro_pontos
+UNION ALL
+SELECT 'Total de galeoes gastos na loja',
+       CAST(COALESCE(SUM(valor_total),0) AS CHAR)
+FROM compra
+UNION ALL
+SELECT 'Folha salarial dos professores',
+       CAST(COALESCE(SUM(salario),0) AS CHAR)
+FROM professor
+UNION ALL
+SELECT 'Total de galeoes nos cofres dos alunos',
+       CAST(COALESCE(SUM(saldo_galeoes),0) AS CHAR)
+FROM aluno;
 
 
 -- =====================================================================
