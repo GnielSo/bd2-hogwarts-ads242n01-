@@ -359,37 +359,188 @@ SELECT COUNT(*) AS total_disciplinas FROM disciplina; -- esperado: 8
 SELECT COUNT(*) AS total_matriculas FROM matricula;   -- esperado: 33
 
 -- =====================================================================
--- 4. TRIGGERS
+-- 4. TRIGGERS: AS REGRAS QUE SE CUMPREM SOZINHAS
 -- =====================================================================
--- Questão 20 - trg_pontos_casa
 
--- Questão 21 - trg_valida_compra
+-- Questao 20: atualizar os pontos da casa do aluno apos inserir registro
+DELIMITER $$
+CREATE TRIGGER trg_pontos_casa
+AFTER INSERT ON registro_pontos
+FOR EACH ROW
+BEGIN
+    UPDATE casa c
+    JOIN aluno a ON a.id_casa = c.id_casa
+    SET c.pontos = c.pontos + NEW.pontos
+    WHERE a.id_aluno = NEW.id_aluno;
+END$$
+DELIMITER ;
 
--- Questão 22 - trg_baixa_compra
+-- Questao 21: validar estoque e saldo antes de inserir compra
+DELIMITER $$
+CREATE TRIGGER trg_valida_compra
+BEFORE INSERT ON compra
+FOR EACH ROW
+BEGIN
+    DECLARE v_preco DECIMAL(10,2);
+    DECLARE v_estoque INT;
+    DECLARE v_saldo DECIMAL(10,2);
 
--- Questão 23 - trg_situacao_nota
+    SELECT preco, estoque
+      INTO v_preco, v_estoque
+    FROM produto
+    WHERE id_produto = NEW.id_produto;
 
--- Questão 24 - trg_audita_salario
+    SELECT saldo_galeoes
+      INTO v_saldo
+    FROM aluno
+    WHERE id_aluno = NEW.id_aluno;
 
--- Pergunta para pensar: por que a validação é BEFORE e a baixa é AFTER?
--- Resposta:
+    IF v_estoque < NEW.quantidade THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Estoque insuficiente no Beco Diagonal';
+    END IF;
 
--- Questão 25 - INSERT registro_pontos
+    IF v_saldo < (v_preco * NEW.quantidade) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Galeões insuficientes no cofre do aluno';
+    END IF;
 
--- Questão 25 - INSERT compra
+    SET NEW.valor_total = v_preco * NEW.quantidade;
+END$$
+DELIMITER ;
 
--- Questão 25 - Rony tenta comprar a Nimbus
--- Resultado:
+-- Questao 22: baixar estoque e saldo depois da compra
+DELIMITER $$
+CREATE TRIGGER trg_baixa_compra
+AFTER INSERT ON compra
+FOR EACH ROW
+BEGIN
+    UPDATE produto
+    SET estoque = estoque - NEW.quantidade
+    WHERE id_produto = NEW.id_produto;
 
--- Questão 25 - Hermione tenta comprar o caldeirão
--- Resultado:
+    UPDATE aluno
+    SET saldo_galeoes = saldo_galeoes - NEW.valor_total
+    WHERE id_aluno = NEW.id_aluno;
+END$$
+DELIMITER ;
 
--- Questão 25 - Recuperação do Rony em Poções
+-- Questao 23: recalcular situacao sempre que a nota mudar
+DELIMITER $$
+CREATE TRIGGER trg_situacao_nota
+BEFORE UPDATE ON matricula
+FOR EACH ROW
+BEGIN
+    SET NEW.situacao = CASE
+        WHEN NEW.nota >= 6 THEN 'Aprovado'
+        ELSE 'Reprovado'
+    END;
+END$$
+DELIMITER ;
 
--- Questão 25 - Salário e data de admissão do Hagrid
--- Linhas em log_auditoria:
--- Por que o reajuste da questão 10 não aparece:
+-- Questao 24: auditar alteracao de salario
+DELIMITER $$
+CREATE TRIGGER trg_audita_salario
+AFTER UPDATE ON professor
+FOR EACH ROW
+BEGIN
+    IF OLD.salario <> NEW.salario THEN
+        INSERT INTO log_auditoria (tabela, operacao, descricao)
+        VALUES (
+            'professor',
+            'UPDATE',
+            CONCAT(OLD.nome, ': salario de ',
+                   FORMAT(OLD.salario, 2), ' para ',
+                   FORMAT(NEW.salario, 2))
+        );
+    END IF;
+END$$
+DELIMITER ;
 
+-- Pergunta para pensar: por que a validacao da compra precisa ser BEFORE
+-- e a baixa do estoque precisa ser AFTER?
+-- Resposta: BEFORE permite verificar estoque e saldo e preencher valor_total
+-- antes de gravar. Se uma regra falhar, o INSERT e bloqueado sem alterar os
+-- dados. AFTER executa a baixa somente depois que a compra foi inserida com
+-- sucesso, evitando descontar estoque ou saldo em uma compra recusada.
+
+-- =====================================================================
+-- 4.1. TESTANDO OS TRIGGERS
+-- =====================================================================
+
+-- Questao 25: INSERT registro_pontos
+INSERT INTO registro_pontos
+(id_aluno, id_prof, pontos, motivo, data_registro) VALUES
+(2,3,20,'Feitico de levitacao perfeito','2026-09-10'),
+(1,2,-10,'Atraso na aula de Pocoes','2026-09-12'),
+(5,2,15,'Pocao do Morto-Vivo impecavel','2026-09-12'),
+(8,5,10,'Cuidou de um testralio ferido','2026-09-20'),
+(11,4,25,'Ajudou os alunos do 1o ano','2026-09-25'),
+(4,4,30,'Identificou uma Mimbulus mimbletonia','2026-10-02'),
+(6,1,-20,'Fora da cama apos o toque de recolher','2026-10-05'),
+(1,6,50,'Conjurou um Patrono corporeo','2026-10-15'),
+(9,3,15,'Duelo exemplar no Clube de Duelos','2026-10-18'),
+(5,1,-30,'Duelo proibido no corredor','2026-10-31'),
+(10,7,5,'Interpretacao da bola de cristal','2026-11-03'),
+(13,4,10,'Colheita de mandragoras','2026-11-05'),
+(3,9,10,'Identificou um bezoar','2026-11-06'),
+(8,3,20,'Resposta brilhante sobre o Diadema','2026-11-08'),
+(6,2,25,'Antidoto para venenos comuns','2026-11-09'),
+(5,9,40,'Melhor pocao do Clube do Slugue','2026-11-09');
+
+-- INSERT compra: valor_total sera calculado pelo trigger
+INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra) VALUES
+(5,2,1,'2026-09-01'),
+(2,5,2,'2026-09-02'),
+(1,3,10,'2026-09-03'),
+(3,4,5,'2026-09-03'),
+(9,8,1,'2026-09-15'),
+(8,5,1,'2026-09-20'),
+(11,1,1,'2026-10-01'),
+(6,3,20,'2026-10-10'),
+(1,7,2,'2026-10-20'),
+(13,4,10,'2026-11-02');
+
+-- Teste: Rony tenta comprar Nimbus 2001. Deve falhar por saldo insuficiente.
+-- Execute separadamente para observar a mensagem:
+-- INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra)
+-- VALUES (3, 2, 1, '2026-11-10');
+-- Resultado esperado: 'Galeoes insuficientes no cofre do aluno'.
+
+-- Teste: Hermione tenta comprar Caldeirao sem estoque. Deve falhar.
+-- INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra)
+-- VALUES (2, 6, 1, '2026-11-10');
+-- Resultado esperado: 'Estoque insuficiente no Beco Diagonal'.
+
+-- Rony fez recuperacao de Pocoes: situacao sera recalculada pelo trigger
+UPDATE matricula
+SET nota = 6.5
+WHERE id_aluno = 3
+  AND id_disc = (SELECT id_disc FROM disciplina WHERE nome_disc = 'Pocoes');
+
+SELECT a.nome, d.nome_disc, m.nota, m.situacao
+FROM matricula m
+JOIN aluno a ON a.id_aluno = m.id_aluno
+JOIN disciplina d ON d.id_disc = m.id_disc
+WHERE a.nome = 'Rony Weasley' AND d.nome_disc = 'Pocoes';
+
+-- Atualizar salario de Hagrid: gera um registro de auditoria
+UPDATE professor SET salario = 5000.00 WHERE nome = 'Rubeo Hagrid';
+
+-- Atualizar somente a data: nao gera auditoria, pois salario nao mudou
+UPDATE professor
+SET data_admissao = '1993-08-15'
+WHERE nome = 'Rubeo Hagrid';
+
+SELECT * FROM log_auditoria;
+
+-- Conferencias dos triggers
+SELECT nome_casa, pontos FROM casa ORDER BY pontos DESC;
+SELECT nome, saldo_galeoes FROM aluno WHERE nome IN ('Draco Malfoy','Harry Potter');
+SELECT nome_produto, estoque FROM produto
+WHERE nome_produto IN ('Vassoura Nimbus 2001','Sapo de Chocolate');
+SELECT SUM(valor_total) AS total_compras FROM compra;
+SELECT COUNT(*) AS total_logs FROM log_auditoria;
 
 -- =====================================================================
 -- 5. CONTROLE DE TRANSAÇÕES (TCL)
