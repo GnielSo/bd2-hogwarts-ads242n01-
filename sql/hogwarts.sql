@@ -3,7 +3,7 @@
 -- Disciplina: Manipulação de Dados / Banco de Dados II (ADS242N01)
 -- Professor: Aguinaldo Neto
 --
--- Aluno:
+-- Aluno: 
 -- Matrícula:
 --
 -- Escreva cada resposta logo abaixo do comentário da questão.
@@ -985,4 +985,97 @@ FROM casa
 ORDER BY pontos DESC;
 
 SELECT * FROM vw_placar_casas;
+
+
+-- =====================================================================
+-- 8. CONTROLE DE ACESSO (DCL): QUEM PODE VER O QUE
+-- =====================================================================
+
+-- Questao 39: criar usuarios
+CREATE USER IF NOT EXISTS 'filch'@'localhost'
+IDENTIFIED BY 'MadameNorra#1';
+
+CREATE USER IF NOT EXISTS 'mcgonagall'@'localhost'
+IDENTIFIED BY 'Animago#Gato1';
+
+CREATE USER IF NOT EXISTS 'dumbledore'@'localhost'
+IDENTIFIED BY 'Fenix#Fawkes1';
+
+-- Questao 40: Filch pode consultar somente a view do placar
+GRANT SELECT ON hogwarts.vw_placar_casas TO 'filch'@'localhost';
+
+-- Questao 41: permissoes de McGonagall
+GRANT SELECT, INSERT ON hogwarts.registro_pontos
+TO 'mcgonagall'@'localhost';
+
+GRANT SELECT ON hogwarts.aluno
+TO 'mcgonagall'@'localhost';
+
+GRANT SELECT ON hogwarts.vw_boletim
+TO 'mcgonagall'@'localhost';
+
+-- Questao 42: Dumbledore recebe todos os privilegios e pode repassa-los
+GRANT ALL PRIVILEGES ON hogwarts.*
+TO 'dumbledore'@'localhost'
+WITH GRANT OPTION;
+
+-- Questao 43: conferir permissoes
+SHOW GRANTS FOR 'filch'@'localhost';
+SHOW GRANTS FOR 'mcgonagall'@'localhost';
+
+-- Questao 44: testes devem ser executados conectando como filch
+-- SELECT * FROM hogwarts.vw_placar_casas;
+-- Deve funcionar.
+-- SELECT * FROM hogwarts.aluno;
+-- Deve falhar com erro 1142 (SELECT command denied), pois Filch nao recebeu
+-- permissao de SELECT na tabela aluno.
+
+-- Questao 45: testes conectando como mcgonagall
+-- a) Registrar 10 pontos para Hermione, pela professora McGonagall
+-- Executar conectado como mcgonagall:
+-- USE hogwarts;
+-- INSERT INTO registro_pontos
+-- (id_aluno, id_prof, pontos, motivo, data_registro)
+-- VALUES (2, 1, 10, 'Ajudou um colega em Transfiguracao', '2026-11-10');
+-- b) Este UPDATE deve ser negado por falta de permissao:
+-- UPDATE casa SET pontos = 1000 WHERE id_casa = 1;
+-- Resposta: o primeiro comando aciona o trigger. O trigger executa com os
+-- privilegios do DEFINER (usuario que o criou), portanto consegue atualizar
+-- casa mesmo que mcgonagall nao tenha permissao direta de UPDATE nessa tabela.
+
+-- Questao 46: revogar INSERT de McGonagall
+REVOKE INSERT ON hogwarts.registro_pontos
+FROM 'mcgonagall'@'localhost';
+
+SHOW GRANTS FOR 'mcgonagall'@'localhost';
+
+-- Questao 47: papel monitor
+CREATE ROLE IF NOT EXISTS 'monitor';
+
+GRANT SELECT ON hogwarts.vw_boletim TO 'monitor';
+GRANT SELECT ON hogwarts.vw_placar_casas TO 'monitor';
+
+CREATE USER IF NOT EXISTS 'percy'@'localhost'
+IDENTIFIED BY 'Monitor#Chefe1';
+
+GRANT 'monitor' TO 'percy'@'localhost';
+SET DEFAULT ROLE 'monitor' TO 'percy'@'localhost';
+
+-- Resposta: roles facilitam a administracao. As permissoes sao concedidas
+-- ao papel uma unica vez e depois atribuidas aos usuarios que exercem a
+-- mesma funcao, evitando repetir GRANT para cada monitor.
+
+-- Questao 48: remover usuarios e papel criados
+DROP USER IF EXISTS 'filch'@'localhost';
+DROP USER IF EXISTS 'mcgonagall'@'localhost';
+DROP USER IF EXISTS 'dumbledore'@'localhost';
+DROP USER IF EXISTS 'percy'@'localhost';
+DROP ROLE IF EXISTS 'monitor';
+
+-- =====================================================================
+-- FIM DA ATIVIDADE
+-- Observacao: as questoes que provocam erros intencionais estao comentadas.
+-- Execute-as individualmente para registrar o codigo e a mensagem do MySQL.
+-- Para as questoes 44 e 45, abra conexoes separadas com os usuarios indicados.
+-- =====================================================================
 
