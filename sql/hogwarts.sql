@@ -309,33 +309,54 @@ GROUP BY situacao;
 
 SELECT nome, salario FROM professor WHERE nome = 'Minerva McGonagall';
 SELECT nome_produto, preco FROM produto WHERE nome_produto = 'Sapo de Chocolate';
-
-
 -- =====================================================================
--- 3. REMOÇÃO DE DADOS (DELETE) E TESTES DE RESTRIÇÕES
+-- 3. REMOCAO DE DADOS (DELETE) E TESTES DE RESTRICOES
 -- =====================================================================
--- Questão 13
--- Erro:
--- Explicação:
 
--- Questão 14
--- Erro:
--- Explicação:
+-- Questao 13: teste de FK - este DELETE deve falhar porque Sonserina
+-- esta referenciada por professor e aluno. Execute separadamente para
+-- observar o erro; mantido comentado para o script continuar.
+-- DELETE FROM casa WHERE nome_casa = 'Sonserina';
+-- Explicacao: erro 1451 (Cannot delete or update a parent row):
+-- existem registros dependentes que referenciam essa casa.
 
--- Questão 15
--- Erro:
--- Explicação:
+-- Questao 14: teste de CHECK - deve falhar, pois o ano 8 esta fora de 1 a 7.
+-- INSERT INTO aluno (nome, ano_escolar, id_casa, saldo_galeoes, email)
+-- VALUES ('Dobby', 8, 1, 0.00, 'dobby@hogwarts.edu');
+-- Explicacao: violacao da constraint chk_aluno_ano.
 
--- Questão 16
--- Erro:
--- Explicação:
+-- Questao 15: teste de UNIQUE - deve falhar porque o e-mail ja pertence
+-- a Harry Potter.
+-- INSERT INTO aluno (nome, ano_escolar, id_casa, saldo_galeoes, email)
+-- VALUES ('Harry Potter (Polissuco)', 5, 1, 0.00, 'harry.potter@hogwarts.edu');
+-- Explicacao: erro 1062, valor duplicado na constraint uq_aluno_email.
 
--- Questão 17
+-- Questao 16: teste de integridade - deve falhar porque Snape ministra Pocoes
+-- e possui registros relacionados quando os dados forem inseridos na secao 4.
+-- Neste ponto, a FK de disciplina ja impede a exclusao.
+-- DELETE FROM professor WHERE nome = 'Severo Snape';
+-- Explicacao: erro 1451, pois disciplina.id_prof referencia Severo Snape.
 
--- Questão 18
+-- Questao 17: Lockhart pode ser excluido porque nao e referenciado por
+-- nenhuma disciplina nem por registros de pontos.
+DELETE FROM professor WHERE nome = 'Gilderoy Lockhart';
 
--- Questão 19
+-- Questao 18: excluir primeiro matriculas de Vicente Crabbe e depois o aluno
+SET SQL_SAFE_UPDATES = 0;
+DELETE FROM matricula
+WHERE id_aluno IN (SELECT id_aluno FROM aluno WHERE nome = 'Vicente Crabbe');
 
+DELETE FROM aluno WHERE nome = 'Vicente Crabbe';
+
+-- Questao 19: excluir disciplinas sem matriculas
+DELETE FROM disciplina
+WHERE id_disc NOT IN (SELECT id_disc FROM matricula);
+
+-- Conferencia apos a secao 3
+SELECT COUNT(*) AS total_professores FROM professor; -- esperado: 8
+SELECT COUNT(*) AS total_alunos FROM aluno;            -- esperado: 13
+SELECT COUNT(*) AS total_disciplinas FROM disciplina; -- esperado: 8
+SELECT COUNT(*) AS total_matriculas FROM matricula;   -- esperado: 33
 
 -- =====================================================================
 -- 4. TRIGGERS
