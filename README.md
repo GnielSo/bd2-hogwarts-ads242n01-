@@ -8,7 +8,7 @@
 ## Aluno
 
 | Nome | Matrícula | Usuário do GitHub |
-| --- | --- | --- |
+| Geniel souza | 2422670 | Gnielso |
 |  |  |  |
 
 ## O cenário
