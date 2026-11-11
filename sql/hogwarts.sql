@@ -225,31 +225,90 @@ UNION ALL SELECT 'compra', COUNT(*) FROM compra
 UNION ALL SELECT 'log_auditoria', COUNT(*) FROM log_auditoria;
 
 -- =====================================================================
--- 2. MANUTENÇÃO PÓS-CARGA (ALTER E UPDATE)
+-- 2. MANUTENCAO POS-CARGA (ALTER E UPDATE)
 -- =====================================================================
--- Questão 1
 
--- Questão 2
+-- 2.1. Alteracoes de estrutura (ALTER TABLE)
+-- Questao 1
+ALTER TABLE aluno ADD COLUMN email VARCHAR(100);
 
--- Questão 3
+-- Questao 2
+ALTER TABLE matricula ADD COLUMN situacao VARCHAR(20) DEFAULT 'Cursando';
 
--- Questão 4
+-- Questao 3
+ALTER TABLE produto ADD COLUMN ativo CHAR(1) DEFAULT 'S';
 
--- Questão 5
+-- Questao 4
+ALTER TABLE casa MODIFY COLUMN fundador VARCHAR(100);
 
--- Questão 6
+-- Questao 5
+ALTER TABLE professor RENAME COLUMN data_contratacao TO data_admissao;
 
--- Questão 7
+-- Conferencia das alteracoes
+DESC aluno;
+DESC matricula;
+DESC produto;
+DESC casa;
+DESC professor;
 
--- Questão 8
+-- 2.2. Atualizacoes de dados (UPDATE)
 
--- Questão 9
+-- Questao 6: gerar e-mails a partir dos nomes
+UPDATE aluno
+SET email = LOWER(CONCAT(REPLACE(nome, ' ', '.'), '@hogwarts.edu'));
 
--- Questão 10
+-- Questao 7: impedir e-mails repetidos
+ALTER TABLE aluno
+ADD CONSTRAINT uq_aluno_email UNIQUE (email);
 
--- Questão 11
+-- Questao 8: bonus de 0.5 na disciplina ministrada por Lupin, limitado a 10
+UPDATE matricula
+SET nota = LEAST(nota + 0.5, 10)
+WHERE id_disc IN (
+    SELECT id_disc
+    FROM disciplina
+    WHERE id_prof = (
+        SELECT id_prof FROM professor WHERE nome = 'Remo Lupin'
+    )
+);
 
--- Questão 12
+-- Questao 9: atualizar situacao de todas as matriculas
+UPDATE matricula
+SET situacao = CASE
+    WHEN nota >= 6 THEN 'Aprovado'
+    ELSE 'Reprovado'
+END;
+
+-- Questao 10: reajuste de 10% para diretores admitidos antes de 1980
+UPDATE professor
+SET salario = salario * 1.10
+WHERE id_casa IS NOT NULL
+  AND data_admissao < '1980-01-01';
+
+-- Questao 11: produtos sem estoque ficam inativos
+UPDATE produto
+SET ativo = 'N'
+WHERE estoque = 0;
+
+-- Questao 12: promocao de 20% na loja Dedosdemel
+UPDATE produto
+SET preco = preco * 0.80
+WHERE loja = 'Dedosdemel';
+
+-- Conferencias das questoes 8 a 12
+SELECT a.nome, d.nome_disc, m.nota
+FROM matricula m
+JOIN aluno a ON a.id_aluno = m.id_aluno
+JOIN disciplina d ON d.id_disc = m.id_disc
+WHERE a.nome = 'Harry Potter'
+  AND d.nome_disc = 'Defesa Contra as Artes das Trevas';
+
+SELECT situacao, COUNT(*) AS quantidade
+FROM matricula
+GROUP BY situacao;
+
+SELECT nome, salario FROM professor WHERE nome = 'Minerva McGonagall';
+SELECT nome_produto, preco FROM produto WHERE nome_produto = 'Sapo de Chocolate';
 
 
 -- =====================================================================
